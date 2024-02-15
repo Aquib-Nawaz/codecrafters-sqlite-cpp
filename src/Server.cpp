@@ -1,6 +1,7 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include "btree.h"
 
 int main(int argc, char* argv[]) {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -24,12 +25,17 @@ int main(int argc, char* argv[]) {
         // Uncomment this to pass the first stage
          database_file.seekg(16);  // Skip the first 16 bytes of the header
 
-         char buffer[2];
-         database_file.read(buffer, 2);
+         unsigned short page_size = bigEndian(&database_file, 2);
+         unsigned int realPageSize = page_size;
 
-         unsigned short page_size = (static_cast<unsigned char>(buffer[1]) | (static_cast<unsigned char>(buffer[0]) << 8));
+         if(page_size == 1)
+             realPageSize = 0x10000;
+        char table[] = "table";
+        uint64_t cnt = countWithWhereClause(&database_file, 1, 1, (void *)&table, realPageSize);
+        std::cout << "database page size: " << realPageSize << std::endl;
+        std::cout << "number of tables: " << cnt << std::endl;
 
-         std::cout << "database page size: " << page_size << std::endl;
+        database_file.close();
     }
 
     return 0;
