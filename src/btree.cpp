@@ -3,6 +3,9 @@
 //
 #include "btree.h"
 #include <cassert>
+#include <vector>
+#include <cstring>
+
 uint64_t bigEndianVarInt(std::ifstream *is, int maxLength){
     unsigned char d;
     *is >> d;
