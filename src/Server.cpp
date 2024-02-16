@@ -41,10 +41,10 @@ int main(int argc, char* argv[]) {
     else if(command == ".tables") {
         std::vector<char *> retList;
         countWithWhereClause(&database_file, 1, 1, (void *)table, realPageSize, 2, &retList);
-        for(int i=0;i<retList.size()-1; i++){
+        for(int i=retList.size()-1; i>0;i--){
             printf("%s ", retList[i]);
         }
-        printf("%s",retList.back());
+        printf("%s",retList.front());
     }
 
     return 0;
