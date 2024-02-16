@@ -9,6 +9,15 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <cassert>
+#include <cstring>
+
+template<class T>
+const T& max(const T& a, const T& b)
+{
+    return (a < b) ? b : a;
+}
+
 
 
 #define INDEX_TABLE_KEY_MAX_LENGTH 2147483647
@@ -72,14 +81,96 @@ typedef uint64_t rowId_t;
 #define COLUMN_VALUE_BLOB_SIZE(size) ((size-12)/2)
 #define COLUMN_VALUE_STRING_SIZE(size) ((size-13)/2)
 
+template<typename T>
 uint64_t countWithWhereClause(std::ifstream*, int pageNum, int columnNum, void* value, int pageSize,
-                              int retColNum=-1, std::vector<char *>* returnList = nullptr);
+                              int retColNum=-1, std::vector<T>* returnList = nullptr);
 uint64_t bigEndianVarInt(std::ifstream* , int maxLength=9);
 uint64_t bigEndian(std::ifstream* , int length);
 
+std::vector<std::string> split(const std::string& s, const std::string& delimiter);
+void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types, int);
+uint64_t countRows(std::ifstream *, int pageNum, int pageSize);
+
+
+template<typename T>
+T getColumn(std::ifstream *is, uint64_t type);
 
 //The Reserved region
 
+template<typename T>
+uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void* value, int pageSize,
+                              int retColumnNum, std::vector<T>*returnList){
 
+    int64_t fileOffset = (int64_t)(pageSize)*(pageNum-1);
+    if(pageNum==1){
+        //Skip DB Header
+        fileOffset += HEADER_SIZE;
+    }
+    is->seekg(fileOffset+BTREE_TYPE_OFFSET_1);
+    char c;
+    is->read(&c, 1);
+    uint64_t ret = 0;
+
+    is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
+    uint16_t numCell = bigEndian(is, 2);
+
+    switch(c){
+        case LEAF_TABLE_B_TREE_TYPE: {
+
+            is->seekg(fileOffset + CELL_CONTENT_AREA_START_2);
+            uint16_t fileContentAreaStart = bigEndian(is, 2);
+
+            is->seekg( fileContentAreaStart+(int64_t)(pageSize)*(pageNum-1));
+
+            for (int cell=0; cell<numCell; cell++){
+
+                uint64_t cellPayloadSize = bigEndianVarInt(is);
+                rowId_t key = bigEndianVarInt(is);
+
+                uint64_t payloadStartOffset = is->tellg();
+
+                uint64_t payloadHeaderSize = bigEndianVarInt(is);
+
+                std::vector<uint64_t> types;
+
+                for (int i = 0; i < max(columnNo, retColumnNum) ; i++) {
+                    types.push_back(bigEndianVarInt(is));
+                }
+
+                is->seekg(payloadStartOffset + payloadHeaderSize);
+
+                skipColumnValues(is, types, columnNo-1);
+                uint64_t type = types[columnNo-1];
+
+                char* curValue = getColumn<char *>(is, type);
+                if(strcmp(curValue, (char*)value)==0){
+                    ret+=1;
+
+                    if(retColumnNum!=-1) {
+
+                        is->seekg(payloadStartOffset + payloadHeaderSize);
+                        skipColumnValues(is, types, retColumnNum - 1);
+
+                        type = types[retColumnNum - 1];
+                        returnList->push_back(getColumn<T>(is, type));
+
+                    }
+                }
+                free(curValue);
+
+                is->seekg(payloadStartOffset+cellPayloadSize);
+            }
+            break;
+        }
+        case INTERIOR_TABLE_BTREE_TYPE:
+        case LEAF_INDEX_B_TREE_TYPE:
+        case INTERIOR_INDEX_BTREE_TYPE:
+            printf("Unsupported Format\n");
+            break;
+        default:
+            printf("Error Page Type %d\n", c);
+    }
+    return ret;
+}
 
 #endif //GIT_STARTER_CPP_BTREE_H

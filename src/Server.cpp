@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include "btree.h"
+#include <sstream>
 
 int main(int argc, char* argv[]) {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -31,7 +32,7 @@ int main(int argc, char* argv[]) {
 
     if (command == ".dbinfo") {
 
-        uint64_t cnt = countWithWhereClause(&database_file, 1, 1, (void *)table, realPageSize);
+        uint64_t cnt = countWithWhereClause<char*>(&database_file, 1, 1, (void *)table, realPageSize);
         std::cout << "database page size: " << realPageSize << std::endl;
         std::cout << "number of tables: " << cnt << std::endl;
 
@@ -43,8 +44,22 @@ int main(int argc, char* argv[]) {
         countWithWhereClause(&database_file, 1, 1, (void *)table, realPageSize, 2, &retList);
         for(int i=retList.size()-1; i>0;i--){
             printf("%s ", retList[i]);
+            free(retList[i]);
         }
         printf("%s",retList.front());
+        free(retList.front());
+
+    }
+
+    else{
+        std::string query = argv[2];
+        std::vector<uint64_t> retList;
+        std::vector<std::string> keyWords = split(query, " ");
+        countWithWhereClause(&database_file, 1, 2, (void *)(keyWords.back().data()),
+                             realPageSize, 4, &retList);
+
+        assert(!retList.empty());
+        std::cout << countRows(&database_file, retList.front(), realPageSize) << std::endl;
     }
 
     return 0;

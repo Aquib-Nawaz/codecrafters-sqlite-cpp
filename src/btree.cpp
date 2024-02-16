@@ -2,14 +2,6 @@
 // Created by Aquib Nawaz on 15/02/24.
 //
 #include "btree.h"
-#include <cassert>
-#include <cstring>
-
-template<class T>
-const T& max(const T& a, const T& b)
-{
-    return (a < b) ? b : a;
-}
 
 uint64_t bigEndianVarInt(std::ifstream *is, int maxLength){
     unsigned char d;
@@ -41,43 +33,68 @@ uint64_t bigEndian(std::ifstream *is, int length){
     return ret;
 }
 
-static void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types,
+uint64_t getNumBytes(uint64_t type){
+    if(type<=4)
+        return type;
+
+    else if(type==5)
+        return 6;
+
+    else if(type<=7)
+        return 8;
+
+    else if(type<=9)
+        return 0;
+
+    else if(type>=12 && type%2==0)
+        return COLUMN_VALUE_BLOB_SIZE(type);
+
+    assert(type>=13 && type%2==1);
+    return COLUMN_VALUE_STRING_SIZE(type);
+}
+
+void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types,
                              int columnNo ){
 
     for(int i = 0; i < columnNo ; i++){
         uint64_t type = types[i];
-        switch (type) {
-            case COLUMN_VALUE_NULL_TYPE:
-                break;
-            case COLUMN_VALUE_1_BYTE_INT_TYPE:
-            case COLUMN_VALUE_2_BYTE_INT_TYPE:
-            case COLUMN_VALUE_3_BYTE_INT_TYPE:
-            case COLUMN_VALUE_4_BYTE_INT_TYPE:
-                break;
-            case COLUMN_VALUE_6_BYTE_INT_TYPE:
-                type = 6;
-                break;
-            case COLUMN_VALUE_8_BYTE_INT_TYPE:
-            case COLUMN_VALUE_FLOAT_TYPE:
-                type = 8;
-                break;
-            default: {
-                if (type >= 13 && type % 2 == 1) {
-                    //String
-                    type = COLUMN_VALUE_STRING_SIZE(type);
-                } else if (type >= 12 && type % 2 == 0) {
-                    //blob
-                    type = COLUMN_VALUE_BLOB_SIZE(type);
-                }
-                is->seekg(type, std::ios_base::cur);
-            }
-        }
+        is->seekg(getNumBytes(type), std::ios_base::cur);
     }
 }
 
-uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void* value, int pageSize,
-                              int retColumnNum, std::vector<char*>*returnList){
+template<>
+char *getColumn(std::ifstream *is, uint64_t type){
 
+    char* selectColumnValue;
+    type = COLUMN_VALUE_STRING_SIZE(type);
+    selectColumnValue = (char *) malloc(type + 1);
+    selectColumnValue[type] = '\0';
+    is->read(selectColumnValue, (long)type);
+    return selectColumnValue;
+}
+
+template<>
+uint64_t getColumn(std::ifstream *is, uint64_t type) {
+    assert(type>0 && type<=6);
+    return bigEndian(is, (int)getNumBytes(type));
+}
+
+std::vector<std::string> split(const std::string& s, const std::string& delimiter) {
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (s.substr (pos_start));
+    return res;
+}
+
+uint64_t countRows(std::ifstream *is, int pageNum, int pageSize){
     int64_t fileOffset = (int64_t)(pageSize)*(pageNum-1);
     if(pageNum==1){
         //Skip DB Header
@@ -90,72 +107,19 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
 
     is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
     uint16_t numCell = bigEndian(is, 2);
-
-    switch(c){
-        case LEAF_TABLE_B_TREE_TYPE: {
-
-            is->seekg(fileOffset + CELL_CONTENT_AREA_START_2);
-            uint16_t fileContentAreaStart = bigEndian(is, 2);
-
-            is->seekg( fileContentAreaStart);
-
-            for (int cell=0; cell<numCell; cell++){
-
-                uint64_t cellPayloadSize = bigEndianVarInt(is);
-                rowId_t key = bigEndianVarInt(is);
-
-                uint64_t payloadStartOffset = is->tellg();
-
-                uint64_t payloadHeaderSize = bigEndianVarInt(is);
-
-                std::vector<uint64_t> types;
-
-                for (int i = 0; i < max(columnNo, retColumnNum) ; i++) {
-                    types.push_back(bigEndianVarInt(is));
-                }
-
-                is->seekg(payloadStartOffset + payloadHeaderSize);
-
-                skipColumnValues(is, types, columnNo-1);
-                uint64_t type = types[columnNo-1];
-
-                assert(type>=13 && type%2==1);
-                type = COLUMN_VALUE_STRING_SIZE(type);
-                char curValue[type+1];
-                curValue[type] = '\0';
-                is->read(curValue, type);
-                if(strcmp(curValue, (char*)value)==0){
-                    ret+=1;
-
-                    if(retColumnNum!=-1) {
-
-                        is->seekg(payloadStartOffset + payloadHeaderSize);
-                        skipColumnValues(is, types, retColumnNum - 1);
-
-                        type = types[retColumnNum - 1];
-                        assert(type >= 13 && type % 2 == 1);
-                        type = COLUMN_VALUE_STRING_SIZE(type);
-                        char *selectColumnValue = (char *) malloc(type + 1);
-                        selectColumnValue[type] = '\0';
-                        is->read(selectColumnValue, type);
-                        returnList->push_back(selectColumnValue);
-                    }
-                }
-
-                is->seekg(payloadStartOffset+cellPayloadSize);
-            }
-            break;
-        }
-        case INTERIOR_TABLE_BTREE_TYPE:
+    switch (c) {
+        case LEAF_TABLE_B_TREE_TYPE:
         case LEAF_INDEX_B_TREE_TYPE:
-        case INTERIOR_INDEX_BTREE_TYPE:
-            printf("Unsupported Format\n");
+            ret = numCell;
             break;
-        default:
-            printf("Error Page Type %d\n", c);
+        case INTERIOR_TABLE_BTREE_TYPE:
+        case INTERIOR_INDEX_BTREE_TYPE:
+            printf("Unsupported Page Type\n");
     }
     return ret;
 }
+
+
 
 #if 0
 int main(){
