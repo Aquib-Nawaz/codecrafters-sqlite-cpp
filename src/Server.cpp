@@ -5,7 +5,7 @@
 
 int main(int argc, char* argv[]) {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
-    std::cout << "Logs from your program will appear here" << std::endl;
+//    std::cout << "Logs from your program will appear here" << std::endl;
 
     if (argc != 3) {
         std::cerr << "Expected two arguments" << std::endl;
@@ -44,6 +44,7 @@ int main(int argc, char* argv[]) {
         for(int i=0;i<retList.size(); i++){
             printf("%s ", retList[i]);
         }
+        printf("\n");
     }
 
     return 0;
