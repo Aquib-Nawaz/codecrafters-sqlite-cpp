@@ -3,6 +3,7 @@
 //
 #include "btree.h"
 #include <cassert>
+#include <cstring>
 
 template<class T>
 const T& max(const T& a, const T& b)
