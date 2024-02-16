@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 
     if (command == ".dbinfo") {
 
-        uint64_t cnt = countWithWhereClause<char*>(&database_file, 1, 1, (void *)table, realPageSize);
+        uint64_t cnt = countWithWhereClause<char*>(&database_file, 1, SQLITE_SCHEMA_TYPE_COLUMN, (void *)table, realPageSize);
         std::cout << "database page size: " << realPageSize << std::endl;
         std::cout << "number of tables: " << cnt << std::endl;
 
@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
 
     else if(command == ".tables") {
         std::vector<char *> retList;
-        countWithWhereClause(&database_file, 1, 1, (void *)table, realPageSize, 2, &retList);
+        countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_TYPE_COLUMN, (void *)table, realPageSize, SQLITE_SCHEMA_NAME_COLUMN, &retList);
         for(int i=retList.size()-1; i>0;i--){
             printf("%s ", retList[i]);
             free(retList[i]);
@@ -53,13 +53,47 @@ int main(int argc, char* argv[]) {
 
     else{
         std::string query = argv[2];
-        std::vector<uint64_t> retList;
+        std::vector<uint64_t> pageNum;
         std::vector<std::string> keyWords = split(query, " ");
-        countWithWhereClause(&database_file, 1, 2, (void *)(keyWords.back().data()),
-                             realPageSize, 4, &retList);
+        toLower(keyWords[1]);
+        countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN, (void *) (keyWords.back().data()),
+                             realPageSize, SQLITE_SCHEMA_PAGE_NUM_COLUMN, &pageNum);
+        if(keyWords[1].starts_with("COUNT")) {
+            assert(!pageNum.empty());
+            std::cout << countRows(&database_file, pageNum.front(), realPageSize) << std::endl;
 
-        assert(!retList.empty());
-        std::cout << countRows(&database_file, retList.front(), realPageSize) << std::endl;
+        }
+        else {
+
+            std::string columnName = keyWords[1];
+            std::vector<char*> tableCreateSql;
+            countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN, (void *) (keyWords.back().data()),
+                                 realPageSize, SQLITE_SCHEMA_TEXT_COLUMN, &tableCreateSql);
+
+            std::string createSqlText (tableCreateSql.front());
+            createSqlText = createSqlText.substr(createSqlText.find('(')+1, createSqlText.size()-createSqlText.find('(')-2);
+            std::vector<std::string>tableColumnNames = split( createSqlText, "\n\t");
+
+            int columnNum = 1;
+            std::vector<std::string>columnNameType;
+
+            while(columnNum <= tableColumnNames.size()){
+                columnNameType = split(tableColumnNames[columnNum - 1]," ");
+                if(columnNameType[0]==columnName)
+                    break;
+                columnNum++;
+            }
+
+            assert(columnNum <= tableColumnNames.size());
+
+            std::vector<std::string> values;
+            countWithWhereClause(&database_file, pageNum.front(), -1, nullptr,
+                                     realPageSize, columnNum, &values);
+            for(int i=0; i<values.size(); i++){
+                std::cout << values[i] << std::endl;
+            }
+        }
+
     }
 
     return 0;

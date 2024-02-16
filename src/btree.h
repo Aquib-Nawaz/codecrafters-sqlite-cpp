@@ -11,6 +11,9 @@
 #include <vector>
 #include <cassert>
 #include <cstring>
+#include <algorithm>
+#include <cctype>
+
 
 template<class T>
 const T& max(const T& a, const T& b)
@@ -78,8 +81,14 @@ typedef uint64_t rowId_t;
 #define COLUMN_VALUE_6_BYTE_INT_TYPE 5
 #define COLUMN_VALUE_8_BYTE_INT_TYPE 6
 #define COLUMN_VALUE_FLOAT_TYPE 7
+
 #define COLUMN_VALUE_BLOB_SIZE(size) ((size-12)/2)
 #define COLUMN_VALUE_STRING_SIZE(size) ((size-13)/2)
+
+#define SQLITE_SCHEMA_TYPE_COLUMN 1
+#define SQLITE_SCHEMA_NAME_COLUMN 2
+#define SQLITE_SCHEMA_PAGE_NUM_COLUMN 4
+#define SQLITE_SCHEMA_TEXT_COLUMN 5
 
 template<typename T>
 uint64_t countWithWhereClause(std::ifstream*, int pageNum, int columnNum, void* value, int pageSize,
@@ -91,6 +100,7 @@ std::vector<std::string> split(const std::string& s, const std::string& delimite
 void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types, int);
 uint64_t countRows(std::ifstream *, int pageNum, int pageSize);
 
+void toLower(std::string);
 
 template<typename T>
 T getColumn(std::ifstream *is, uint64_t type);
@@ -136,14 +146,19 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
                 for (int i = 0; i < max(columnNo, retColumnNum) ; i++) {
                     types.push_back(bigEndianVarInt(is));
                 }
+                bool currentRecordMatches = true;
+                uint64_t type;
+                if(columnNo !=-1){
+                    is->seekg(payloadStartOffset + payloadHeaderSize);
 
-                is->seekg(payloadStartOffset + payloadHeaderSize);
+                    skipColumnValues(is, types, columnNo-1);
+                    type = types[columnNo-1];
 
-                skipColumnValues(is, types, columnNo-1);
-                uint64_t type = types[columnNo-1];
-
-                char* curValue = getColumn<char *>(is, type);
-                if(strcmp(curValue, (char*)value)==0){
+                    char* curValue = getColumn<char *>(is, type);
+                    currentRecordMatches = strcmp(curValue, (char*)value)==0;
+                    free(curValue);
+                }
+                if(currentRecordMatches){
                     ret+=1;
 
                     if(retColumnNum!=-1) {
@@ -156,7 +171,6 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
 
                     }
                 }
-                free(curValue);
 
                 is->seekg(payloadStartOffset+cellPayloadSize);
             }

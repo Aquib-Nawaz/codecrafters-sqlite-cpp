@@ -4,14 +4,16 @@
 #include "btree.h"
 
 uint64_t bigEndianVarInt(std::ifstream *is, int maxLength){
-    unsigned char d;
-    *is >> d;
+    char c;
+    is->read(&c, 1);
+    unsigned char d = static_cast<unsigned char>(c);
 
     uint64_t ret = 0;
     int length =1;
     while((d>>7 & 1) && length<maxLength){
         ret = ret << 7 | d & (1<<7)-1;
-        *is >> d;
+        is->read(&c, 1);
+        d = static_cast<unsigned char>(c);
         length ++;
     }
     ret = ret << 7 | d;
@@ -79,6 +81,19 @@ uint64_t getColumn(std::ifstream *is, uint64_t type) {
     return bigEndian(is, (int)getNumBytes(type));
 }
 
+template<>
+std::string getColumn(std::ifstream *is, uint64_t type){
+    std::string selectColumnValue;
+    if(type<12)
+        selectColumnValue = std::to_string(getColumn<uint64_t>(is,type));
+    else{
+        char* temp = getColumn<char*>(is, type);
+        selectColumnValue = temp;
+        free(temp);
+    }
+    return selectColumnValue;
+}
+
 std::vector<std::string> split(const std::string& s, const std::string& delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();
     std::string token;
@@ -87,7 +102,8 @@ std::vector<std::string> split(const std::string& s, const std::string& delimite
     while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
         token = s.substr (pos_start, pos_end - pos_start);
         pos_start = pos_end + delim_len;
-        res.push_back (token);
+        if(!token.empty())
+            res.push_back (token);
     }
 
     res.push_back (s.substr (pos_start));
@@ -119,7 +135,10 @@ uint64_t countRows(std::ifstream *is, int pageNum, int pageSize){
     return ret;
 }
 
-
+void toLower(std::string data) {
+    std::transform(data.begin(), data.end(), data.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+}
 
 #if 0
 int main(){
