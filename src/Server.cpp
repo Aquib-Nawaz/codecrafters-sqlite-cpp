@@ -58,7 +58,8 @@ int main(int argc, char* argv[]) {
         toLower(keyWords[1]);
         countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN, (void *) (keyWords.back().data()),
                              realPageSize, SQLITE_SCHEMA_PAGE_NUM_COLUMN, &pageNum);
-        if(keyWords[1].starts_with("COUNT")) {
+        toLower(keyWords[1]);
+        if(keyWords[1].starts_with("count")) {
             assert(!pageNum.empty());
             std::cout << countRows(&database_file, pageNum.front(), realPageSize) << std::endl;
 
