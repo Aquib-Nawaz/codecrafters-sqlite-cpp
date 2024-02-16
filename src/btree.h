@@ -187,4 +187,6 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
     return ret;
 }
 
+std::string trim(const std::string &);
+
 #endif //GIT_STARTER_CPP_BTREE_H

@@ -140,12 +140,27 @@ void toLower(std::string data) {
                    [](unsigned char c) { return std::tolower(c); });
 }
 
+std::string trim(const std::string &str){
+    std::string delimeters = " \t\n";
+    int i;
+    for(i=0; i<str.size(); i++){
+        if(delimeters.find(str[i])==std::string::npos)
+            break;
+    }
+    int j;
+    for(j=str.size()-1; j>=i; j--){
+        if(delimeters.find(str[j])==std::string::npos)
+            break;
+    }
+    return str.substr(i, j-i+1);
+}
+
+
 #if 0
 int main(){
-    std::ifstream database_file("sample.db", std::ios::binary);
-    database_file.seekg(16);  // Skip the first 16 bytes of the header
-//    std::cout << bigEndian(&database_file, 2) << std::endl;
-    std::string str(10, ' ');
-    database_file.read(str.data(), 10);
+  auto splitted = split("id integer primary key, chocolate text,coffee text,pistachio text,strawberry text,grape text", ",");
+  for(auto col:splitted){
+      std::cout << trim(col) << std::endl;
+  }
 }
 #endif

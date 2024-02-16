@@ -73,13 +73,13 @@ int main(int argc, char* argv[]) {
 
             std::string createSqlText (tableCreateSql.front());
             createSqlText = createSqlText.substr(createSqlText.find('(')+1, createSqlText.size()-createSqlText.find('(')-2);
-            std::vector<std::string>tableColumnNames = split( createSqlText, "\n\t");
+            std::vector<std::string>tableColumnNames = split( createSqlText, ",");
 
             int columnNum = 1;
             std::vector<std::string>columnNameType;
 
             while(columnNum <= tableColumnNames.size()){
-                columnNameType = split(tableColumnNames[columnNum - 1]," ");
+                columnNameType = split(trim(tableColumnNames[columnNum - 1])," ");
                 if(columnNameType[0]==columnName)
                     break;
                 columnNum++;
