@@ -85,7 +85,13 @@ int main(int argc, char* argv[]) {
                 columnNum++;
             }
 
-            assert(columnNum <= tableColumnNames.size());
+            if(columnNum > tableColumnNames.size()){
+                for(int i=0; i<tableColumnNames.size(); i++){
+                    std::cout << tableColumnNames[i] << std::endl;
+                }
+                std::cout << createSqlText << std::endl;
+                return 1;
+            }
 
             std::vector<std::string> values;
             countWithWhereClause(&database_file, pageNum.front(), -1, nullptr,
