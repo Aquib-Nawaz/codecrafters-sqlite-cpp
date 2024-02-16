@@ -3,8 +3,12 @@
 //
 #include "btree.h"
 #include <cassert>
-#include <vector>
-#include <cstring>
+
+template<class T>
+const T& max(const T& a, const T& b)
+{
+    return (a < b) ? b : a;
+}
 
 uint64_t bigEndianVarInt(std::ifstream *is, int maxLength){
     unsigned char d;
@@ -36,8 +40,9 @@ uint64_t bigEndian(std::ifstream *is, int length){
     return ret;
 }
 
-static void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types){
-    int columnNo =  types.size()-1;
+static void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types,
+                             int columnNo ){
+
     for(int i = 0; i < columnNo ; i++){
         uint64_t type = types[i];
         switch (type) {
@@ -69,7 +74,8 @@ static void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types){
     }
 }
 
-uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void* value, int pageSize){
+uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void* value, int pageSize,
+                              int retColumnNum, std::vector<char*>*returnList){
 
     int64_t fileOffset = (int64_t)(pageSize)*(pageNum-1);
     if(pageNum==1){
@@ -80,16 +86,18 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
     char c;
     is->read(&c, 1);
     uint64_t ret = 0;
+
+    is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
+    uint16_t numCell = bigEndian(is, 2);
+
     switch(c){
         case LEAF_TABLE_B_TREE_TYPE: {
-
-            is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
-            uint16_t numCell = bigEndian(is, 2);
 
             is->seekg(fileOffset + CELL_CONTENT_AREA_START_2);
             uint16_t fileContentAreaStart = bigEndian(is, 2);
 
             is->seekg( fileContentAreaStart);
+
             for (int cell=0; cell<numCell; cell++){
 
                 uint64_t cellPayloadSize = bigEndianVarInt(is);
@@ -101,22 +109,37 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
 
                 std::vector<uint64_t> types;
 
-                for (int i = 0; i < columnNo ; i++) {
+                for (int i = 0; i < max(columnNo, retColumnNum) ; i++) {
                     types.push_back(bigEndianVarInt(is));
                 }
 
                 is->seekg(payloadStartOffset + payloadHeaderSize);
 
-                skipColumnValues(is, types);
-                uint64_t type = types.back();
+                skipColumnValues(is, types, columnNo-1);
+                uint64_t type = types[columnNo-1];
 
                 assert(type>=13 && type%2==1);
                 type = COLUMN_VALUE_STRING_SIZE(type);
                 char curValue[type+1];
                 curValue[type] = '\0';
-                is->read(curValue, 5);
-                if(strcmp(curValue, (char*)value)==0)
+                is->read(curValue, type);
+                if(strcmp(curValue, (char*)value)==0){
                     ret+=1;
+
+                    if(retColumnNum!=-1) {
+
+                        is->seekg(payloadStartOffset + payloadHeaderSize);
+                        skipColumnValues(is, types, retColumnNum - 1);
+
+                        type = types[retColumnNum - 1];
+                        assert(type >= 13 && type % 2 == 1);
+                        type = COLUMN_VALUE_STRING_SIZE(type);
+                        char *selectColumnValue = (char *) malloc(type + 1);
+                        selectColumnValue[type] = '\0';
+                        is->read(selectColumnValue, type);
+                        returnList->push_back(selectColumnValue);
+                    }
+                }
 
                 is->seekg(payloadStartOffset+cellPayloadSize);
             }

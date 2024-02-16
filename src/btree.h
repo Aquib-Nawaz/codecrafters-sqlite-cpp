@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <vector>
+
 
 #define INDEX_TABLE_KEY_MAX_LENGTH 2147483647
 //In header
@@ -23,7 +25,7 @@
 //Integer are Big Endian
 
 #define HEADER_SIZE 100 //For Root Page only
-#define LEAF_BTREE_HEADER_SIZE 8 //OR 12
+#define LEAF_BTREE_HEADER_SIZE 8
 #define INTERIOR_BTREE_HEADER_SIZE 12
 
 //BTREE HEADER
@@ -70,7 +72,8 @@ typedef uint64_t rowId_t;
 #define COLUMN_VALUE_BLOB_SIZE(size) ((size-12)/2)
 #define COLUMN_VALUE_STRING_SIZE(size) ((size-13)/2)
 
-uint64_t countWithWhereClause(std::ifstream*, int pageNum, int columnNo, void* value, int pageSize);
+uint64_t countWithWhereClause(std::ifstream*, int pageNum, int columnNum, void* value, int pageSize,
+                              int retColNum=-1, std::vector<char *>* returnList = nullptr);
 uint64_t bigEndianVarInt(std::ifstream* , int maxLength=9);
 uint64_t bigEndian(std::ifstream* , int length);
 

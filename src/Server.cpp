@@ -15,27 +15,35 @@ int main(int argc, char* argv[]) {
     std::string database_file_path = argv[1];
     std::string command = argv[2];
 
+    std::ifstream database_file(database_file_path, std::ios::binary);
+    if (!database_file) {
+        std::cerr << "Failed to open the database file" << std::endl;
+        return 1;
+    }
+
+    database_file.seekg(16);
+    unsigned short page_size = bigEndian(&database_file, 2);
+    int realPageSize = page_size;
+
+    if(page_size == 1)
+        realPageSize = 0x10000;
+    char table[] = "table";
+
     if (command == ".dbinfo") {
-        std::ifstream database_file(database_file_path, std::ios::binary);
-        if (!database_file) {
-            std::cerr << "Failed to open the database file" << std::endl;
-            return 1;
-        }
 
-        // Uncomment this to pass the first stage
-         database_file.seekg(16);  // Skip the first 16 bytes of the header
-
-         unsigned short page_size = bigEndian(&database_file, 2);
-         unsigned int realPageSize = page_size;
-
-         if(page_size == 1)
-             realPageSize = 0x10000;
-        char table[] = "table";
-        uint64_t cnt = countWithWhereClause(&database_file, 1, 1, (void *)&table, realPageSize);
+        uint64_t cnt = countWithWhereClause(&database_file, 1, 1, (void *)table, realPageSize);
         std::cout << "database page size: " << realPageSize << std::endl;
         std::cout << "number of tables: " << cnt << std::endl;
 
         database_file.close();
+    }
+
+    else if(command == ".tables") {
+        std::vector<char *> retList;
+        countWithWhereClause(&database_file, 1, 1, (void *)table, realPageSize, 2, &retList);
+        for(int i=0;i<retList.size(); i++){
+            printf("%s ", retList[i]);
+        }
     }
 
     return 0;
