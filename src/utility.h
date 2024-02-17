@@ -15,7 +15,7 @@
 #include <cctype>
 
 
-std::string trim(const std::string &);
+std::string trim(const std::string &, const std::string & delimeters = ", \t\n;");
 void toLower(std::string &);
 std::vector<std::string> split(const std::string& s, const std::string& delimiter);
 uint64_t bigEndianVarInt(std::ifstream* , int maxLength=9);

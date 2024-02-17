@@ -4,8 +4,8 @@
 
 #include "utility.h"
 
-std::string trim(const std::string &str){
-    std::string delimeters = ", \t\n;";
+std::string trim(const std::string &str, const std::string& delimeters){
+
     int i;
     for(i=0; i<str.size(); i++){
         if(delimeters.find(str[i])==std::string::npos)

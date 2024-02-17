@@ -77,8 +77,16 @@ int main(int argc, char* argv[]) {
             std::string createSqlText (tableCreateSql.front());
             std::vector<int> columnNums = getColumnNums(createSqlText, commandInfo.columns);
 
+            int whereColumnNum = -1;
+            void* whereColumnValue = nullptr;
+
+            if(!commandInfo.whereColumn.empty()){
+                whereColumnNum = getColumnNums(createSqlText, {commandInfo.whereColumn}).front();
+                whereColumnValue = (void*)commandInfo.whereColumnValue.c_str();
+            }
+
             std::vector<std::string> values;
-            countWithWhereClause(&database_file, pageNum.front(), -1, nullptr,
+            countWithWhereClause(&database_file, pageNum.front(), whereColumnNum, whereColumnValue,
                                      realPageSize, columnNums, &values);
             for(int i=0; i<values.size(); i++){
                 std::cout << values[i] << std::endl;

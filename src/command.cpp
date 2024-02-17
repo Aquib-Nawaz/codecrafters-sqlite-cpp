@@ -9,9 +9,9 @@ CommandInfo parseCommand(const std::string& command){
     std::vector<std::string> keyWords = split(command, " ");
     toLower(keyWords[1]);
     CommandInfo ret;
-    ret.tableName = trim(keyWords.back());
     if(keyWords[1].starts_with("count")){
         ret.type = COUNT_COMMAND;
+        ret.tableName = trim(keyWords.back());
         return ret;
     }
     int i=1;
@@ -26,6 +26,12 @@ CommandInfo parseCommand(const std::string& command){
         }
         i++;
     }
+    ret.tableName = trim(keyWords[i+1]);
+    i+=3;
+    ret.whereColumn = trim(keyWords[i]);
+    i+=2;
+    ret.whereColumnValue = trim(keyWords[i], "'");
+
     return ret;
 }
 
