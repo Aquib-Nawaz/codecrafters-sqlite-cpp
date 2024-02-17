@@ -5,7 +5,7 @@
 #include "utility.h"
 
 std::string trim(const std::string &str){
-    std::string delimeters = " \t\n";
+    std::string delimeters = ", \t\n;";
     int i;
     for(i=0; i<str.size(); i++){
         if(delimeters.find(str[i])==std::string::npos)
@@ -19,7 +19,7 @@ std::string trim(const std::string &str){
     return str.substr(i, j-i+1);
 }
 
-void toLower(std::string data) {
+void toLower(std::string &data) {
     std::transform(data.begin(), data.end(), data.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 }
@@ -72,3 +72,21 @@ uint64_t bigEndian(std::ifstream *is, int length){
     }
     return ret;
 }
+
+template<>
+int getMax<int>(int v){
+    return v;
+}
+
+template<>
+int getMax<std::vector<int>>(std::vector<int> v){
+    return *max_element(v.begin(), v.end());
+}
+
+#if 0
+int main(){
+    std::string word = "COUNT";
+    toLower(word);
+    std::cout << word << std::endl;
+}
+#endif

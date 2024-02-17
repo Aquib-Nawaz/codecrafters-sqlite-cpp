@@ -3,6 +3,7 @@
 #include <fstream>
 #include "btree.h"
 #include <sstream>
+#include "command.h"
 
 int main(int argc, char* argv[]) {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -55,48 +56,30 @@ int main(int argc, char* argv[]) {
     else{
         std::string query = argv[2];
         std::vector<uint64_t> pageNum;
-        std::vector<std::string> keyWords = split(query, " ");
-        toLower(keyWords[1]);
-        countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN, (void *) (keyWords.back().data()),
+
+        CommandInfo commandInfo = parseCommand(query);
+
+        countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN, (void *) (commandInfo.tableName.c_str()),
                              realPageSize, SQLITE_SCHEMA_PAGE_NUM_COLUMN, &pageNum);
-        toLower(keyWords[1]);
-        if(keyWords[1].starts_with("count")) {
-            assert(!pageNum.empty());
+
+        assert(!pageNum.empty());
+        if(commandInfo.type == COUNT_COMMAND) {
             std::cout << countRows(&database_file, pageNum.front(), realPageSize) << std::endl;
 
         }
         else {
 
-            std::string columnName = keyWords[1];
             std::vector<char*> tableCreateSql;
-            countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN, (void *) (keyWords.back().data()),
-                                 realPageSize, SQLITE_SCHEMA_TEXT_COLUMN, &tableCreateSql);
+            countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN,
+                                 (void *) (commandInfo.tableName.data()),realPageSize,
+                                 SQLITE_SCHEMA_TEXT_COLUMN, &tableCreateSql);
 
             std::string createSqlText (tableCreateSql.front());
-            createSqlText = createSqlText.substr(createSqlText.find('(')+1, createSqlText.size()-createSqlText.find('(')-2);
-            std::vector<std::string>tableColumnNames = split( createSqlText, ",");
-
-            int columnNum = 1;
-            std::vector<std::string>columnNameType;
-
-            while(columnNum <= tableColumnNames.size()){
-                columnNameType = split(trim(tableColumnNames[columnNum - 1])," ");
-                if(columnNameType[0]==columnName)
-                    break;
-                columnNum++;
-            }
-
-            if(columnNum > tableColumnNames.size()){
-                for(int i=0; i<tableColumnNames.size(); i++){
-                    std::cout << tableColumnNames[i] << std::endl;
-                }
-                std::cout << createSqlText << std::endl;
-                return 1;
-            }
+            std::vector<int> columnNums = getColumnNums(createSqlText, commandInfo.columns);
 
             std::vector<std::string> values;
             countWithWhereClause(&database_file, pageNum.front(), -1, nullptr,
-                                     realPageSize, columnNum, &values);
+                                     realPageSize, columnNums, &values);
             for(int i=0; i<values.size(); i++){
                 std::cout << values[i] << std::endl;
             }

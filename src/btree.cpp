@@ -23,7 +23,7 @@ uint64_t getNumBytes(uint64_t type){
     return COLUMN_VALUE_STRING_SIZE(type);
 }
 
-void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types,
+void skipColumnValues(std::ifstream *is, const std::vector<uint64_t> &types,
                              int columnNo ){
 
     for(int i = 0; i < columnNo ; i++){
@@ -85,6 +85,58 @@ uint64_t countRows(std::ifstream *is, int pageNum, int pageSize){
             printf("Unsupported Page Type\n");
     }
     return ret;
+}
+
+static uint64_t getColumnType(std:: ifstream* is, int retColumnNum, uint64_t payloadBodyOffset, const std::vector<uint64_t>& types){
+    is->seekg(payloadBodyOffset);
+    skipColumnValues(is, types, retColumnNum - 1);
+
+    return types[retColumnNum - 1];
+}
+
+template<>
+void populateReturnColumnsList<uint64_t , int>(std:: ifstream* is, const int& retColumnNum , std::vector<uint64_t >* returnList,
+                                               uint64_t payloadBodyOffset, const std::vector<uint64_t>& types){
+    if(returnList!= nullptr) {
+        uint64_t type = getColumnType(is, retColumnNum, payloadBodyOffset, types);
+        returnList->push_back(getColumn<uint64_t>(is, type));
+
+    }
+}
+
+template<>
+void populateReturnColumnsList<char* , int>(std:: ifstream* is, const int& retColumnNum , std::vector<char* >* returnList,
+                              uint64_t payloadBodyOffset, const std::vector<uint64_t>& types){
+    if(returnList!= nullptr) {
+        uint64_t type = getColumnType(is, retColumnNum, payloadBodyOffset, types);
+        returnList->push_back(getColumn<char*>(is, type));
+
+    }
+}
+
+template<>
+void populateReturnColumnsList<std::string , int>(std:: ifstream* is, const int& retColumnNum , std::vector<std::string >* returnList,
+                              uint64_t payloadBodyOffset, const std::vector<uint64_t>& types){
+    if(returnList!= nullptr) {
+        uint64_t type = getColumnType(is, retColumnNum, payloadBodyOffset, types);
+        returnList->push_back(getColumn<std::string>(is, type));
+    }
+}
+
+template<>
+void populateReturnColumnsList<std::string , std::vector<int>>(std:: ifstream* is, const std::vector<int> &retColumnNums , std::vector<std::string >* returnList,
+                                                 uint64_t payloadBodyOffset, const std::vector<uint64_t>& types){
+    if(returnList!= nullptr) {
+        std::string toWrite = "";
+        int i;
+        for(i=0; i<retColumnNums.size()-1; i++){
+            int retColumnNum = retColumnNums[i];
+            uint64_t type = getColumnType(is, retColumnNum, payloadBodyOffset, types);
+            toWrite += getColumn<std::string>(is, type) + "|";
+        }
+        toWrite += getColumn<std::string>(is, getColumnType(is, retColumnNums[i], payloadBodyOffset, types));
+        returnList->push_back(toWrite);
+    }
 }
 
 #if 0

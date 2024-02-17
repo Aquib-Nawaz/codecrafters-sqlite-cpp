@@ -27,7 +27,7 @@ const T& max(const T& a, const T& b)
 //In header
 #define RESERVED_REGION_SIZE_OFFSET 20
 
-//The Actuala location of the keys in page is arbitary
+//The Actual location of the keys in page is arbitrary
 //But Logically the are sorted ()
 //Interior B Tree P K P K P
 // P K are combined to form cell last P is alone like me
@@ -90,17 +90,20 @@ typedef uint64_t rowId_t;
 #define SQLITE_SCHEMA_PAGE_NUM_COLUMN 4
 #define SQLITE_SCHEMA_TEXT_COLUMN 5
 
-void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types, int);
+//The Reserved region
+
+void skipColumnValues(std::ifstream *is, const std::vector<uint64_t> &types, int);
 uint64_t countRows(std::ifstream *, int pageNum, int pageSize);
 
 template<typename T>
 T getColumn(std::ifstream *is, uint64_t type);
 
-//The Reserved region
+template<typename T, typename U>
+void populateReturnColumnsList(std:: ifstream*, const U& , std::vector<T>*, uint64_t , const std::vector<uint64_t >&);
 
-template<typename T>
+template<typename T, typename U>
 uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void* value, int pageSize,
-                              int retColumnNum, std::vector<T>*returnList){
+                              U retColumnNum, std::vector<T>*returnList){
 
     int64_t fileOffset = (int64_t)(pageSize)*(pageNum-1);
     if(pageNum==1){
@@ -134,7 +137,7 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
 
                 std::vector<uint64_t> types;
 
-                for (int i = 0; i < max(columnNo, retColumnNum) ; i++) {
+                for (int i = 0; i < max(columnNo, getMax(retColumnNum)) ; i++) {
                     types.push_back(bigEndianVarInt(is));
                 }
                 bool currentRecordMatches = true;
@@ -151,18 +154,9 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
                 }
                 if(currentRecordMatches){
                     ret+=1;
-
-                    if(retColumnNum!=-1) {
-
-                        is->seekg(payloadStartOffset + payloadHeaderSize);
-                        skipColumnValues(is, types, retColumnNum - 1);
-
-                        type = types[retColumnNum - 1];
-                        returnList->push_back(getColumn<T>(is, type));
-
-                    }
+                    populateReturnColumnsList(is, retColumnNum, returnList, payloadStartOffset
+                                                                            + payloadHeaderSize, types);
                 }
-
                 is->seekg(payloadStartOffset+cellPayloadSize);
             }
             break;
