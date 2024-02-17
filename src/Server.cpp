@@ -32,7 +32,8 @@ int main(int argc, char* argv[]) {
 
     if (command == ".dbinfo") {
 
-        uint64_t cnt = countWithWhereClause<char*>(&database_file, 1, SQLITE_SCHEMA_TYPE_COLUMN, (void *)table, realPageSize);
+        uint64_t cnt = countWithWhereClause<char*>(&database_file, 1, SQLITE_SCHEMA_TYPE_COLUMN, (void *)table,
+                                                   realPageSize, -1, nullptr);
         std::cout << "database page size: " << realPageSize << std::endl;
         std::cout << "number of tables: " << cnt << std::endl;
 

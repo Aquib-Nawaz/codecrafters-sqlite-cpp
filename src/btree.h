@@ -13,7 +13,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cctype>
-
+#include "utility.h"
 
 template<class T>
 const T& max(const T& a, const T& b)
@@ -90,17 +90,8 @@ typedef uint64_t rowId_t;
 #define SQLITE_SCHEMA_PAGE_NUM_COLUMN 4
 #define SQLITE_SCHEMA_TEXT_COLUMN 5
 
-template<typename T>
-uint64_t countWithWhereClause(std::ifstream*, int pageNum, int columnNum, void* value, int pageSize,
-                              int retColNum=-1, std::vector<T>* returnList = nullptr);
-uint64_t bigEndianVarInt(std::ifstream* , int maxLength=9);
-uint64_t bigEndian(std::ifstream* , int length);
-
-std::vector<std::string> split(const std::string& s, const std::string& delimiter);
 void skipColumnValues(std::ifstream *is, std::vector<uint64_t> &types, int);
 uint64_t countRows(std::ifstream *, int pageNum, int pageSize);
-
-void toLower(std::string);
 
 template<typename T>
 T getColumn(std::ifstream *is, uint64_t type);
@@ -186,7 +177,5 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
     }
     return ret;
 }
-
-std::string trim(const std::string &);
 
 #endif //GIT_STARTER_CPP_BTREE_H

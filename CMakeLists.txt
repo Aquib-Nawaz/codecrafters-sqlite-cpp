@@ -4,5 +4,6 @@ set(CMAKE_CXX_STANDARD 20) # Enable the C++20 standard
 
 set(SOURCE_FILES src/Server.cpp)
 list(APPEND SOURCE_FILES src/btree.cpp)
+list(APPEND SOURCE_FILES src/utility.cpp)
 
 add_executable(server ${SOURCE_FILES})
