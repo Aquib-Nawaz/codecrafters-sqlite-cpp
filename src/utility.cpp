@@ -64,13 +64,13 @@ uint64_t bigEndian(std::ifstream *is, int length){
     unsigned char d = static_cast<unsigned char>(c);
     int len = 1;
     uint64_t ret=0;
-    while( len<=length){
+    while( len<length){
         ret = ret << 8 | d ;
         is->read(&c, 1);
         d = static_cast<unsigned char>(c);
         len ++;
     }
-    return ret;
+    return ret<<8|d;
 }
 
 template<>

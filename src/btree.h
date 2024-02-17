@@ -99,7 +99,8 @@ template<typename T>
 T getColumn(std::ifstream *is, uint64_t type);
 
 template<typename T, typename U>
-void populateReturnColumnsList(std:: ifstream*, const U& , std::vector<T>*, uint64_t , const std::vector<uint64_t >&);
+void populateReturnColumnsList(std:: ifstream*, const U& ,
+                               std::vector<T>*, uint64_t , const std::vector<uint64_t >&, uint64_t );
 
 template<typename T, typename U>
 uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void* value, int pageSize,
@@ -117,13 +118,11 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
 
     is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
     uint16_t numCell = bigEndian(is, 2);
+    is->seekg(fileOffset + CELL_CONTENT_AREA_START_2);
+    uint16_t fileContentAreaStart = bigEndian(is, 2);
 
     switch(c){
         case LEAF_TABLE_B_TREE_TYPE: {
-
-            is->seekg(fileOffset + CELL_CONTENT_AREA_START_2);
-            uint16_t fileContentAreaStart = bigEndian(is, 2);
-
             is->seekg( fileContentAreaStart+(int64_t)(pageSize)*(pageNum-1));
 
             for (int cell=0; cell<numCell; cell++){
@@ -155,13 +154,29 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
                 if(currentRecordMatches){
                     ret+=1;
                     populateReturnColumnsList(is, retColumnNum, returnList, payloadStartOffset
-                                                                            + payloadHeaderSize, types);
+                                                                            + payloadHeaderSize, types, key);
                 }
                 is->seekg(payloadStartOffset+cellPayloadSize);
             }
             break;
         }
-        case INTERIOR_TABLE_BTREE_TYPE:
+        case INTERIOR_TABLE_BTREE_TYPE:{
+            is->seekg(fileOffset+LAST_POINTER_PAGE_NUMBER_OFFSET_4);
+            uint32_t lastPageNum = bigEndian(is, 4);
+            is->seekg( fileContentAreaStart+(int64_t)(pageSize)*(pageNum-1));
+
+            for (int cell=0; cell<numCell; cell++){
+                uint64_t childPageNum = bigEndian(is,4);
+                fileOffset = is->tellg();
+                countWithWhereClause(is,childPageNum, columnNo,value, pageSize, retColumnNum,
+                                     returnList);
+                is->seekg(fileOffset);
+                bigEndianVarInt(is);
+            }
+            countWithWhereClause(is,lastPageNum, columnNo,value, pageSize, retColumnNum,
+                                 returnList);
+            break;
+        }
         case LEAF_INDEX_B_TREE_TYPE:
         case INTERIOR_INDEX_BTREE_TYPE:
             printf("Unsupported Format\n");

@@ -29,8 +29,10 @@ CommandInfo parseCommand(const std::string& command){
     ret.tableName = trim(keyWords[i+1]);
     i+=3;
     ret.whereColumn = trim(keyWords[i]);
-    i+=2;
-    ret.whereColumnValue = trim(keyWords[i], "'");
+    int valueStartPos = command.find('=');
+    if(valueStartPos!=std::string::npos){
+        ret.whereColumnValue = trim(command.substr(valueStartPos+1), "' ");
+    }
 
     return ret;
 }

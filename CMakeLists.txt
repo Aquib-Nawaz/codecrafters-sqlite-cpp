@@ -6,5 +6,5 @@ set(SOURCE_FILES src/Server.cpp)
 list(APPEND SOURCE_FILES src/btree.cpp)
 list(APPEND SOURCE_FILES src/utility.cpp)
 list(APPEND SOURCE_FILES src/command.cpp)
-
+#add_compile_options(-g -fsanitize=undefined -fsanitize=address)
 add_executable(server ${SOURCE_FILES})
