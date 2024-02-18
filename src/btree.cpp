@@ -50,7 +50,10 @@ char *getColumn(std::ifstream *is, uint64_t type){
 
 template<>
 uint64_t getColumn(std::ifstream *is, uint64_t type) {
-    assert(type>0 && type<=6);
+    if(type==7 || type>9){
+        std::cout << type << std::endl;
+        assert(0);
+    }
     return bigEndian(is, (int)getNumBytes(type));
 }
 
@@ -164,6 +167,61 @@ void populateReturnColumnsList<std::string , std::vector<int>>(std:: ifstream* i
             toWrite += getColumn<std::string>(is, getColumnType(is, retColumnNums[i],
                                                                 payloadBodyOffset, types));
         returnList->push_back(toWrite);
+    }
+}
+
+void searchByRowId(std::ifstream *is, int pageNum, const std::vector<uint64_t>&rowIds, int pageSize, int & currRowIdIdx,
+                   const std::vector<int> & retColumnNum , std::vector<std::string>* returnList){
+    Page page(is, pageNum, pageSize);
+    switch(page.pageType) {
+        case LEAF_TABLE_B_TREE_TYPE: {
+            for (int cell=0; cell<page.numCell; cell++){
+                is->seekg(page.cellsOffset[cell]);
+                bigEndianVarInt(is);
+                rowId_t key = bigEndianVarInt(is);
+                uint64_t payloadStartOffset = is->tellg();
+
+                uint64_t payloadHeaderSize = bigEndianVarInt(is);
+                if(currRowIdIdx==rowIds.size())
+                    return;
+                if(key!=rowIds[currRowIdIdx]){
+                    continue;
+                }
+                currRowIdIdx++;
+                std::vector<uint64_t> types;
+                for (int i = 0; i < max(1, getMax(retColumnNum)) ; i++) {
+                    types.push_back(bigEndianVarInt(is));
+                }
+                populateReturnColumnsList(is, retColumnNum, returnList, payloadStartOffset+
+                    payloadHeaderSize, types, key);
+
+            }
+            break;
+        }
+        case INTERIOR_TABLE_BTREE_TYPE: {
+            uint32_t lastPageNum = page.lastPageNum;
+            int cell;
+            rowId_t key;
+            for (cell=0; cell<page.numCell; cell++){
+                is->seekg(page.cellsOffset[cell]);
+                uint64_t childPageNum = bigEndian(is,4);
+                key = bigEndianVarInt(is);
+                if(currRowIdIdx==rowIds.size())
+                    return;
+                if(key >= rowIds[currRowIdIdx]){
+                    searchByRowId(is,childPageNum, rowIds,pageSize, currRowIdIdx, retColumnNum,
+                                         returnList);
+                    if(key > rowIds[currRowIdIdx])
+                        break;
+                }
+            }
+            if(cell==page.numCell || (rowIds.size()!=currRowIdIdx && key == rowIds[currRowIdIdx]) )
+                searchByRowId(is,lastPageNum, rowIds,pageSize, currRowIdIdx, retColumnNum,
+                              returnList);
+            break;
+        }
+        default:
+            std::cout << "Unsupported Pagetype " << page.pageType << std::endl;
     }
 }
 

@@ -15,6 +15,7 @@
 #include <cctype>
 #include "utility.h"
 #include "page.h"
+#include <vector>
 
 template<class T>
 const T& max(const T& a, const T& b)
@@ -95,6 +96,8 @@ typedef uint64_t rowId_t;
 
 void skipColumnValues(std::ifstream *is, const std::vector<uint64_t> &types, int);
 uint64_t countRows(std::ifstream *, int pageNum, int pageSize);
+void searchByRowId(std::ifstream *is, int pageNum, const std::vector<uint64_t>&rowIds, int pageSize, int & currRowIdIdx,
+                   const std::vector<int> & , std::vector<std::string>*);
 
 template<typename T>
 T getColumn(std::ifstream *is, uint64_t type);
@@ -111,13 +114,16 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
 
     Page page(is, pageNum, pageSize);
     switch(page.pageType){
+        case LEAF_INDEX_B_TREE_TYPE:
         case LEAF_TABLE_B_TREE_TYPE: {
 
-            for (int cell=0; cell<page.cellsOffset.size(); cell++){
+            for (int cell=0; cell<page.numCell; cell++){
                 is->seekg(page.cellsOffset[cell]);
 
-                uint64_t cellPayloadSize = bigEndianVarInt(is);
-                rowId_t key = bigEndianVarInt(is);
+                bigEndianVarInt(is);
+                rowId_t key;
+                if(page.pageType==LEAF_TABLE_B_TREE_TYPE)
+                    key = bigEndianVarInt(is);
 
                 uint64_t payloadStartOffset = is->tellg();
 
@@ -146,13 +152,12 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
                     populateReturnColumnsList(is, retColumnNum, returnList, payloadStartOffset
                                                                             + payloadHeaderSize, types, key);
                 }
-                is->seekg(payloadStartOffset+cellPayloadSize);
             }
             break;
         }
         case INTERIOR_TABLE_BTREE_TYPE:{
             uint32_t lastPageNum = page.lastPageNum;
-            for (int cell=0; cell<page.cellsOffset.size(); cell++){
+            for (int cell=0; cell<page.numCell; cell++){
                 is->seekg(page.cellsOffset[cell]);
                 uint64_t childPageNum = bigEndian(is,4);
                 countWithWhereClause(is,childPageNum, columnNo,value, pageSize, retColumnNum,
@@ -162,10 +167,36 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
                                  returnList);
             break;
         }
-        case LEAF_INDEX_B_TREE_TYPE:
-        case INTERIOR_INDEX_BTREE_TYPE:
-            printf("Unsupported Format\n");
+        case INTERIOR_INDEX_BTREE_TYPE:{
+            uint32_t lastPageNum = page.lastPageNum;
+            int cell;
+            std::string indexValue;
+            std::string searchValue = std::string((char*)value);
+            for (cell=0; cell<page.numCell; cell++){
+                is->seekg(page.cellsOffset[cell]);
+                uint64_t childPageNum = bigEndian(is,4);
+                bigEndianVarInt(is);
+                uint64_t payloadStartOffset = is->tellg();
+
+                uint64_t payloadHeaderSize = bigEndianVarInt(is);
+
+                uint64_t indexType = bigEndianVarInt(is);
+
+                is->seekg(payloadStartOffset+payloadHeaderSize);
+
+                indexValue = getColumn<std::string>(is,indexType);
+                if(indexValue >= searchValue){
+                    countWithWhereClause(is,childPageNum, columnNo,value, pageSize, retColumnNum,
+                                     returnList);
+                    if(indexValue > searchValue)
+                        break;
+                }
+            }
+            if(cell==page.numCell || indexValue == searchValue)
+                countWithWhereClause(is,lastPageNum, columnNo,value, pageSize, retColumnNum,
+                                 returnList);
             break;
+        }
         default:
             printf("Error Page Type %d\n", page.pageType);
     }

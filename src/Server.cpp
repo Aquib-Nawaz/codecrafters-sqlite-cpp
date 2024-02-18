@@ -85,9 +85,34 @@ int main(int argc, char* argv[]) {
                 whereColumnValue = (void*)commandInfo.whereColumnValue.c_str();
             }
 
+            //Check If Index Occur in db
+            std::string idxName = "idx_"+commandInfo.tableName + "_" + commandInfo.whereColumn;
+
+            int tablePageNum = pageNum.front();
+
+            pageNum.clear();
+
+            countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_NAME_COLUMN, (void *)
+            (idxName.c_str()),realPageSize, SQLITE_SCHEMA_PAGE_NUM_COLUMN, &pageNum);
+
             std::vector<std::string> values;
-            countWithWhereClause(&database_file, pageNum.front(), whereColumnNum, whereColumnValue,
-                                     realPageSize, columnNums, &values);
+
+            if(pageNum.empty()){
+                countWithWhereClause(&database_file, tablePageNum, whereColumnNum, whereColumnValue,
+                                         realPageSize, columnNums, &values);
+            }
+            else{
+                std::vector<uint64_t> rowIds;
+                int idxPageNum = pageNum.front();
+                countWithWhereClause(&database_file, idxPageNum, 1, whereColumnValue,
+                                     realPageSize, 2, &rowIds);
+//                for(int i=0; i<rowIds.size(); i++){
+//                    std::cout << rowIds[i] << std::endl;
+//                }
+                int currRowIdIdx = 0;
+                searchByRowId(&database_file, tablePageNum, rowIds, realPageSize, currRowIdIdx,
+                              columnNums, &values);
+            }
             for(int i=0; i<values.size(); i++){
                 std::cout << values[i] << std::endl;
             }
