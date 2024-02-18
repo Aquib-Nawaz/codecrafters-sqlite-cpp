@@ -44,12 +44,12 @@ int main(int argc, char* argv[]) {
     else if(command == ".tables") {
         std::vector<char *> retList;
         countWithWhereClause(&database_file, 1, SQLITE_SCHEMA_TYPE_COLUMN, (void *)table, realPageSize, SQLITE_SCHEMA_NAME_COLUMN, &retList);
-        for(int i=retList.size()-1; i>0;i--){
+        for(int i=0; i<retList.size()-1;i++){
             printf("%s ", retList[i]);
             free(retList[i]);
         }
-        printf("%s",retList.front());
-        free(retList.front());
+        printf("%s",retList.back());
+        free(retList.back());
 
     }
 

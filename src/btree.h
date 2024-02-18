@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cctype>
 #include "utility.h"
+#include "page.h"
 
 template<class T>
 const T& max(const T& a, const T& b)
@@ -106,26 +107,14 @@ template<typename T, typename U>
 uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void* value, int pageSize,
                               U retColumnNum, std::vector<T>*returnList){
 
-    int64_t fileOffset = (int64_t)(pageSize)*(pageNum-1);
-    if(pageNum==1){
-        //Skip DB Header
-        fileOffset += HEADER_SIZE;
-    }
-    is->seekg(fileOffset+BTREE_TYPE_OFFSET_1);
-    char c;
-    is->read(&c, 1);
     uint64_t ret = 0;
 
-    is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
-    uint16_t numCell = bigEndian(is, 2);
-    is->seekg(fileOffset + CELL_CONTENT_AREA_START_2);
-    uint16_t fileContentAreaStart = bigEndian(is, 2);
-
-    switch(c){
+    Page page(is, pageNum, pageSize);
+    switch(page.pageType){
         case LEAF_TABLE_B_TREE_TYPE: {
-            is->seekg( fileContentAreaStart+(int64_t)(pageSize)*(pageNum-1));
 
-            for (int cell=0; cell<numCell; cell++){
+            for (int cell=0; cell<page.cellsOffset.size(); cell++){
+                is->seekg(page.cellsOffset[cell]);
 
                 uint64_t cellPayloadSize = bigEndianVarInt(is);
                 rowId_t key = bigEndianVarInt(is);
@@ -139,6 +128,7 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
                 for (int i = 0; i < max(columnNo, getMax(retColumnNum)) ; i++) {
                     types.push_back(bigEndianVarInt(is));
                 }
+
                 bool currentRecordMatches = true;
                 uint64_t type;
                 if(columnNo !=-1){
@@ -161,17 +151,12 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
             break;
         }
         case INTERIOR_TABLE_BTREE_TYPE:{
-            is->seekg(fileOffset+LAST_POINTER_PAGE_NUMBER_OFFSET_4);
-            uint32_t lastPageNum = bigEndian(is, 4);
-            is->seekg( fileContentAreaStart+(int64_t)(pageSize)*(pageNum-1));
-
-            for (int cell=0; cell<numCell; cell++){
+            uint32_t lastPageNum = page.lastPageNum;
+            for (int cell=0; cell<page.cellsOffset.size(); cell++){
+                is->seekg(page.cellsOffset[cell]);
                 uint64_t childPageNum = bigEndian(is,4);
-                fileOffset = is->tellg();
                 countWithWhereClause(is,childPageNum, columnNo,value, pageSize, retColumnNum,
                                      returnList);
-                is->seekg(fileOffset);
-                bigEndianVarInt(is);
             }
             countWithWhereClause(is,lastPageNum, columnNo,value, pageSize, retColumnNum,
                                  returnList);
@@ -182,7 +167,7 @@ uint64_t countWithWhereClause(std::ifstream* is, int pageNum, int columnNo, void
             printf("Unsupported Format\n");
             break;
         default:
-            printf("Error Page Type %d\n", c);
+            printf("Error Page Type %d\n", page.pageType);
     }
     return ret;
 }

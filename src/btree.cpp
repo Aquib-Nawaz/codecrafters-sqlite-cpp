@@ -68,43 +68,38 @@ std::string getColumn(std::ifstream *is, uint64_t type){
 }
 
 uint64_t countRows(std::ifstream *is, int pageNum, int pageSize){
-    int64_t fileOffset = (int64_t)(pageSize)*(pageNum-1);
-    if(pageNum==1){
-        //Skip DB Header
-        fileOffset += HEADER_SIZE;
-    }
-    is->seekg(fileOffset+BTREE_TYPE_OFFSET_1);
-    char c;
-    is->read(&c, 1);
+//    int64_t fileOffset = (int64_t)(pageSize)*(pageNum-1);
+//    if(pageNum==1){
+//        //Skip DB Header
+//        fileOffset += HEADER_SIZE;
+//    }
+//    is->seekg(fileOffset+BTREE_TYPE_OFFSET_1);
+//    char c;
+//    is->read(&c, 1);
     uint64_t ret = 0;
-
-    is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
-    uint16_t numCell = bigEndian(is, 2);
-    switch (c) {
+//
+//    is->seekg(fileOffset + NUMBER_OF_CELLS_OFFSET_2);
+//    uint16_t numCell = bigEndian(is, 2);
+    Page page(is, pageNum, pageSize, false);
+    switch (page.pageType) {
         case LEAF_TABLE_B_TREE_TYPE:
         case LEAF_INDEX_B_TREE_TYPE:
-            ret = numCell;
+            ret = page.numCell;
             break;
+        case INTERIOR_INDEX_BTREE_TYPE:
         case INTERIOR_TABLE_BTREE_TYPE:{
-            is->seekg(fileOffset+LAST_POINTER_PAGE_NUMBER_OFFSET_4);
-            uint32_t lastPageNum = bigEndian(is, 4);
-            is->seekg(fileOffset+CELL_CONTENT_AREA_START_2);
-            uint16_t contentStart = bigEndian(is,2);
-            is->seekg( contentStart+(int64_t)(pageSize)*(pageNum-1));
+            uint32_t lastPageNum = page.lastPageNum;
 
-            for (int cell=0; cell<numCell; cell++){
+            for (int cell=0; cell<page.numCell; cell++){
+                is->seekg(page.cellsOffset[cell]);
                 uint32_t childPageNum = bigEndian(is,4);
-                fileOffset = is->tellg();
                 ret += countRows(is, childPageNum, pageSize);
-                is->seekg(fileOffset);
-                bigEndianVarInt(is);
             }
             ret += countRows(is, lastPageNum, pageSize);
             break;
 
         }
-        case INTERIOR_INDEX_BTREE_TYPE:
-            printf("Unsupported PageType\n");
+
     }
     return ret;
 }
